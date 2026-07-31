@@ -7,13 +7,25 @@ export default async function handler(req, res) {
 
     const ip = data.ip || "неизв";
 
-    // Гео: сначала точные координаты, если нет – город по IP
+    // ======== Определяем гео по IP (через ip-api.com) ========
     let geoStr = "не определена";
+    let geoIP = null;
+    if (ip !== "неизв") {
+        try {
+            const geoRes = await fetch(`http://ip-api.com/json/${ip}?fields=city,regionName,country,lat,lon,isp,org`);
+            if (geoRes.ok) {
+                geoIP = await geoRes.json();
+                if (geoIP && geoIP.city) {
+                    geoStr = `${geoIP.city}, ${geoIP.regionName || ""}, ${geoIP.country || ""}`;
+                    if (geoIP.isp) geoStr += `\n🛜 Провайдер: ${geoIP.isp}`;
+                }
+            }
+        } catch(e) {}
+    }
+
+    // Если есть точная геолокация – показываем её поверх IP-гео
     if (data.geo && data.geo.lat) {
         geoStr = `${data.geo.lat.toFixed(4)}, ${data.geo.lon.toFixed(4)} (точность ${data.geo.accuracy}м)`;
-    } else if (data.geoIP && data.geoIP.city) {
-        geoStr = `${data.geoIP.city}, ${data.geoIP.regionName || ""}, ${data.geoIP.country || ""}`;
-        if (data.geoIP.isp) geoStr += `\n🛜 Провайдер: ${data.geoIP.isp}`;
     }
 
     const localIP = data.localIP ? `\n📍 Локальный IP: ${data.localIP}` : "";
